@@ -20,17 +20,22 @@ import com.alibaba.datax.plugin.rdbms.util.DBUtilErrorCode;
 import com.alibaba.datax.plugin.rdbms.util.DataBaseType;
 import com.alibaba.datax.plugin.rdbms.util.RdbmsException;
 import com.google.common.collect.Lists;
+import net.sf.json.JSONArray;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.ibatis.io.Resources;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Types;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -185,7 +190,7 @@ public class MyReader extends Reader {
 
         @Override
         public void startRead(RecordSender recordSender) {
-            int fetchSize = this.readerSliceConfig.getInt(Constant.FETCH_SIZE);
+            /*int fetchSize = this.readerSliceConfig.getInt(Constant.FETCH_SIZE);
 
             //this.commonRdbmsReaderTask.startRead(this.readerSliceConfig, recordSender, super.getTaskPluginCollector(), fetchSize);
 
@@ -233,7 +238,30 @@ public class MyReader extends Reader {
                 throw RdbmsException.asQueryException(this.dataBaseType, e, querySql, table, username);
             } finally {
                 DBUtil.closeDBResources(null, conn);
+            }*/
+
+
+            try {
+                //String resource = "mybatis.xml";           // 定位核心配置文件
+                String resource = "com/alibaba/datax/plugin/reader/mysqlreader/mybatis.xml";           // 定位核心配置文件
+                InputStream inputStream = Resources.getResourceAsStream(resource);
+                SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(inputStream);    // 创建 SqlSessionFactory
+                SqlSession sqlSession = sqlSessionFactory.openSession();    // 获取到 SqlSession
+                List<Map<String,Object>> list = sqlSession.selectList("com.alibaba.datax.plugin.reader.mysqlreader.TestDao.test1");
+                System.out.println("--- list.size : "+list.size());
+                System.out.println(JSONArray.fromObject(list));
+
+                for(Map<String,Object> map : list){
+                    Record record = recordSender.createRecord();
+                    record.addColumn(new StringColumn(String.valueOf(map.get("username"))));
+                    record.addColumn(new StringColumn(String.valueOf(map.get("password"))));
+                    recordSender.sendToWriter(record);
+                }
+
+            } catch (IOException e) {
+                e.printStackTrace();
             }
+
         }
 
         @Override
@@ -366,6 +394,11 @@ public class MyReader extends Reader {
             }
             return record;
         }
+
+
+
+
+
     }
 
 }
